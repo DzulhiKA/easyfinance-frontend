@@ -10,6 +10,7 @@ export default function Sidebar() {
   const menu = [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Categories", href: "/categories" },
+    { label: "Transactions", href: "/transactions" },
     { label: "Reports", href: "/reports" },
   ]
 

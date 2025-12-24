@@ -9,41 +9,83 @@ export default function CategoriesPage() {
   const [name, setName] = useState("")
   const [type, setType] = useState<"income" | "expense">("income")
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
 
+  // --- FETCH DATA (API RETURN ARRAY) ---
   const fetchCategories = async () => {
-    const res = await api.get<Category[]>("/categories")
-    setCategories(res.data)
+    try {
+      setLoading(true)
+
+      const res = await api.get<Category[]>("/categories")
+
+      // VALIDATE: HARUS ARRAY
+      if (Array.isArray(res.data)) {
+        setCategories(res.data)
+      } else {
+        console.error("Invalid categories response:", res.data)
+        setCategories([])
+      }
+    } catch (error) {
+      console.error("Failed to fetch categories:", error)
+      alert("Gagal memuat kategori")
+      setCategories([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
     fetchCategories()
   }, [])
 
+  // --- SUBMIT ---
   const submit = async () => {
-    if (!name) return alert("Nama wajib diisi")
+    if (!name.trim()) return alert("Nama wajib diisi")
 
-    if (editingId) {
-      await api.put(`/categories/${editingId}`, { name, type })
-    } else {
-      await api.post("/categories", { name, type })
+    try {
+      setLoading(true)
+
+      if (editingId !== null) {
+        await api.put(`/categories/${editingId}`, { name, type })
+      } else {
+        await api.post("/categories", { name, type })
+      }
+
+      // Reset form
+      setName("")
+      setType("income")
+      setEditingId(null)
+
+      await fetchCategories()
+    } catch (error) {
+      console.error("Failed to submit category:", error)
+      alert("Gagal menyimpan kategori")
+    } finally {
+      setLoading(false)
     }
-
-    setName("")
-    setType("income")
-    setEditingId(null)
-    fetchCategories()
   }
 
+  // --- EDIT MODE ---
   const edit = (cat: Category) => {
     setEditingId(cat.id)
     setName(cat.name)
     setType(cat.type)
   }
 
+  // --- DELETE ---
   const remove = async (id: number) => {
     if (!confirm("Hapus kategori?")) return
-    await api.delete(`/categories/${id}`)
-    fetchCategories()
+
+    try {
+      setLoading(true)
+      await api.delete(`/categories/${id}`)
+      await fetchCategories()
+    } catch (error) {
+      console.error("Failed to delete category:", error)
+      alert("Gagal menghapus kategori")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -61,7 +103,7 @@ export default function CategoriesPage() {
 
         <select
           value={type}
-          onChange={(e) => setType(e.target.value as any)}
+          onChange={(e) => setType(e.target.value as "income" | "expense")}
           className="border p-2 w-full"
         >
           <option value="income">Income</option>
@@ -70,7 +112,8 @@ export default function CategoriesPage() {
 
         <button
           onClick={submit}
-          className="bg-black text-white px-4 py-2 rounded"
+          disabled={loading}
+          className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
         >
           {editingId ? "Update" : "Tambah"}
         </button>
@@ -86,18 +129,22 @@ export default function CategoriesPage() {
               <th className="p-2 text-right">Aksi</th>
             </tr>
           </thead>
+
           <tbody>
             {categories.map((cat) => (
               <tr key={cat.id} className="border-t">
                 <td className="p-2">{cat.name}</td>
-                <td className="p-2">{cat.type}</td>
+                <td className="p-2 capitalize">{cat.type}</td>
                 <td className="p-2 text-right space-x-2">
-                  <button onClick={() => edit(cat)} className="text-blue-600">
+                  <button
+                    onClick={() => edit(cat)}
+                    className="text-blue-600 hover:underline"
+                  >
                     Edit
                   </button>
                   <button
                     onClick={() => remove(cat.id)}
-                    className="text-red-600"
+                    className="text-red-600 hover:underline"
                   >
                     Hapus
                   </button>
@@ -107,7 +154,11 @@ export default function CategoriesPage() {
           </tbody>
         </table>
 
-        {categories.length === 0 && (
+        {loading && (
+          <div className="p-4 text-center text-gray-500">Memuat...</div>
+        )}
+
+        {!loading && categories.length === 0 && (
           <div className="p-4 text-center text-gray-500">
             Belum ada kategori
           </div>
